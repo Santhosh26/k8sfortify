@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nexusiqsync-pv
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  claimRef:
+    namespace: default
+    name: nexusiqsync-pvc
+  hostPath:
+    path: "/pv/nexusiqsync"
+    type: DirectoryOrCreate
+---    
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nexusiqsync-pvc
+spec:
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 1Gi
+  accessModes:
+  - ReadWriteOnce
+  volumeName: nexusiqsync-pv
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nexusiqsync
+spec:
+  serviceName: nexusiqsync
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nexusiqsync
+  template:
+    metadata:
+      labels:
+        app: nexusiqsync
+    spec:
+      containers:
+      - name: nexusiqsync
+        image: 'localhost:32000/nexusiqsync'
+        volumeMounts:
+        - name: nexusiqsync
+          mountPath: /work
+        - name: nexusiqsyncsecrets
+          mountPath: /nexusiqsyncsecrets        
+      volumes:
+        - name: nexusiqsync
+          persistentVolumeClaim:
+            claimName: nexusiqsync-pvc
+        - name: nexusiqsyncsecrets
+          secret:
+            secretName: nexusiqsyncsecrets
+      nodeSelector:
+        kubernetes.io/hostname: ubuntu01

@@ -1,0 +1,109 @@
+#
+#  Largely copied from Microk8s registry
+#  https://github.com/ubuntu/microk8s/blob/697d2f721bef8ad215ba7f992024e8213339f49c/microk8s-resources/actions/registry.yaml
+#
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: container-registry
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: registry-pv
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  claimRef:
+    namespace: container-registry  
+    name: registry-pvc
+  hostPath:
+    path: "/pv/registry"
+    type: DirectoryOrCreate
+---    
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: container-registry
+  name: registry-pvc
+spec:
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  volumeName: registry-pv  
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: registry
+  name: registry
+  namespace: container-registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: registry
+  template:
+    metadata:
+      labels:
+        app: registry
+    spec:
+      containers:
+        - name: registry
+          image: cdkbot/registry-amd64:2.6
+          env:
+            - name: REGISTRY_HTTP_ADDR
+              value: :5000
+            - name: REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
+              value: /var/lib/registry
+            - name: REGISTRY_STORAGE_DELETE_ENABLED
+              value: "yes"
+          ports:
+            - containerPort: 5000
+              name: registry
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /var/lib/registry
+              name: registry
+      volumes:
+        - name: registry
+          persistentVolumeClaim:
+            claimName: registry-pvc
+      nodeSelector:
+        kubernetes.io/hostname: ubuntu01            
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: registry
+  name: registry
+  namespace: container-registry
+spec:
+  type: NodePort
+  selector:
+    app: registry
+  ports:
+    - name: "registry"
+      port: 5000
+      targetPort: 5000
+      nodePort: 32000
+---
+# https://github.com/kubernetes/enhancements/issues/1755
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: local-registry-hosting
+  namespace: kube-public
+data:
+  localRegistryHosting.v1: |
+    help: "https://microk8s.io/docs/registry-built-in"
+    host: "localhost:32000"

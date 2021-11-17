@@ -1,0 +1,4 @@
+# Not storing our DNS files; they have environment-dependent IP addresses.
+fortifydemo.com.zone
+named.conf.options
+named.conf.local

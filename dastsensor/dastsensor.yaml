@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: dastsensor
+spec:
+  serviceName: dastsensor
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dastsensor
+  template:
+    metadata:
+      labels:
+        app: dastsensor
+    spec:
+      containers:
+        - name: dastsensor
+          env:
+            - name: 'mode'
+              value: '3'
+            - name: 'RCServerHost'
+              value: '+'
+            - name: 'RCServerPort'
+              value: '8089'
+            - name: 'RCServerUseHTTPS'
+              value: 'false'
+            - name: 'RCServerAuthType'
+              value: 'none'
+            - name: 'EDASTApiRootUrl'
+              value: 'https://edast.fortifydemo.com/api/'
+            - name: 'AllowNonTrustedServerCertificate'
+              value: 'false'
+            - name: 'ServiceToken'
+              valueFrom:
+                secretKeyRef:
+                  name: dastsensorsecrets
+                  key: DAST_TOKEN 
+            - name: 'ScannerPoolId'
+              value: '0'
+          image: fortifydocker/webinspect
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              memory: 8Gi          
+            requests:
+              memory: 8Gi 
+          volumeMounts:
+            - name: dastsensorsecrets
+              mountPath: 'c:\dastsensorsecrets'
+          lifecycle:
+            postStart:
+              exec:
+                command: ['certutil', '-addstore', 'root', 'c:\dastsensorsecrets\..data\fortifydemo_ca.crt']              
+      volumes:
+        - name: dastsensorsecrets
+          secret:
+            secretName: dastsensorsecrets
+      imagePullSecrets:
+        - name: regcred
+      nodeSelector:
+        kubernetes.io/os: windows

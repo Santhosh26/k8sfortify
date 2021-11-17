@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mssql-pv
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  claimRef:
+    namespace: default
+    name: mssql-pvc
+  hostPath:
+    path: "/pv/mssql"
+    type: DirectoryOrCreate
+---    
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mssql-pvc
+spec:
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 20Gi
+  accessModes:
+  - ReadWriteOnce
+  volumeName: mssql-pv
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mssql
+spec:
+  serviceName: mssql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mssql
+  template:
+    metadata:
+      labels:
+        app: mssql
+    spec:
+      securityContext:
+        runAsUser: 0
+      containers:
+      - name: mssql
+        image: 'mcr.microsoft.com/mssql/server:2019-CU8-ubuntu-18.04'
+        ports:
+        - containerPort: 1433
+        env:
+        - name: ACCEPT_EULA
+          value: "Y"
+        - name: SA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mssql
+              key: SA_PASSWORD 
+        volumeMounts:
+        - name: mssql-system
+          mountPath: /var/opt/mssql
+      volumes:
+      - name: mssql-system
+        persistentVolumeClaim:
+          claimName: mssql-pvc
+      nodeSelector:
+        kubernetes.io/hostname: ubuntu01
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mssql
+spec:
+  selector:
+    app: mssql
+  ports:
+    - protocol: TCP
+      port: 1433
+      targetPort: 1433
+  type: ClusterIP
+  clusterIP: 10.96.96.1

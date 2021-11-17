@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: sastsensor
+spec:
+  serviceName: sastsensor
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sastsensor
+  template:
+    metadata:
+      labels:
+        app: sastsensor
+    spec:
+      containers:
+      - name: sastsensor
+        image: 'localhost:32000/sastsensor'
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: sastsensorsecrets
+          mountPath: /sastsensorsecrets    
+      volumes:
+        - name: sastsensorsecrets
+          secret:
+            secretName: sastsensorsecrets          
+      nodeSelector:
+        kubernetes.io/os: linux

@@ -1,0 +1,8 @@
+[
+    {
+      "sonatypeProject": "InsecureForum",
+      "sonatypeProjectStage": "Develop",
+      "fortifyApplication": "Insecure Forum",
+      "fortifyApplicationVersion": "1.0"
+    }
+]

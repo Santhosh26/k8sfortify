@@ -1,0 +1,116 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: lim-pv
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  claimRef:
+    namespace: default
+    name: lim-pvc    
+  hostPath:
+    path: 'c:\pv\lim'
+    type: DirectoryOrCreate
+---    
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: lim-pvc
+spec:
+  storageClassName: "" 
+  resources:
+    requests:
+      storage: 1Gi
+  accessModes:
+  - ReadWriteOnce
+  volumeName: lim-pv
+---      
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: lim
+spec:
+  serviceName: lim
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lim
+  template:
+    metadata:
+      labels:
+        app: lim
+    spec:
+      containers:
+        - name: lim
+          ports:
+            - name: https-web
+              containerPort: 443
+              protocol: TCP
+          env:
+            - name: LimUseSSL
+              value: 'true'
+            - name: certpath
+              value: 'c:\limsecrets\..data\fortifydemo_wildcard.pfx'
+            - name: certpassword
+              valueFrom:
+                secretKeyRef:
+                  name: limsecrets
+                  key: certpassword
+            - name: LimAdminWebSiteName
+              value: 'LimAdmin'
+            - name: LimServiceSiteName
+              value: 'LimService'
+            - name: LimDirectory
+              value: 'c:\lim'
+            - name: LimAdminUsername
+              value: 'admin'
+            - name: LimAdminPassword
+              valueFrom:
+                secretKeyRef:
+                  name: limsecrets
+                  key: LimAdminPassword
+            - name: LimAdminEmail
+              value: 'test@example.com'
+            - name: LimAdminFriendlyName
+              value: 'admin'
+          image: fortifydocker/lim:20.2.84
+          imagePullPolicy: IfNotPresent  
+          volumeMounts:
+            - name: limsecrets
+              mountPath: 'c:\limsecrets'
+            - name: limdirectory
+              mountPath: 'c:\lim'
+          resources:
+            limits:
+              memory: 2Gi          
+            requests:
+              memory: 2Gi          
+      volumes:
+        - name: limsecrets
+          secret:
+            secretName: limsecrets            
+        - name: limdirectory
+          persistentVolumeClaim:
+            claimName: lim-pvc    
+      imagePullSecrets:
+        - name: regcred
+      nodeSelector:
+        kubernetes.io/hostname: win01
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lim
+spec:
+  selector:
+    app: lim
+  ports:
+    - name: https-web
+      protocol: TCP
+      port: 443
+      targetPort: 443
+  type: ClusterIP
+  clusterIP: 10.96.96.3

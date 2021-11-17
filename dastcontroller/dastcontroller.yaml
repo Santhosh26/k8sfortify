@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: dastapi
+spec:
+  serviceName: dastapi
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dastapi
+  template:
+    metadata:
+      labels:
+        app: dastapi
+    spec:
+      containers:
+        - name: dastapi
+          ports:
+            - name: https-web
+              containerPort: 443
+              protocol: TCP
+          env:
+            - name: 'ConnectionStrings__EDASTDB'
+              valueFrom:
+                secretKeyRef:
+                  name: dastapisecrets
+                  key: DAST_EDASTDB               
+            - name: ASPNETCORE_Kestrel__Certificates__Default__Path
+              value: 'c:\dastapisecrets\..data\fortifydemo_wildcard.pfx'
+            - name: ASPNETCORE_Kestrel__Certificates__Default__Password
+              valueFrom:
+                secretKeyRef:
+                  name: dastapisecrets
+                  key: PWD_SSL_KEYSTORE               
+            - name: ASPNETCORE_URLS
+              value: 'https://+;http://+'
+          image: fortifydocker/scancentral-dast-api
+          imagePullPolicy: IfNotPresent 
+          volumeMounts:
+            - name: dastapisecrets
+              mountPath: 'C:\dastapisecrets'
+      volumes:
+        - name: dastapisecrets
+          secret:
+            secretName: dastapisecrets             
+      imagePullSecrets:
+        - name: regcred
+      nodeSelector:
+        kubernetes.io/hostname: win01
+---      
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: dastgs
+spec:
+  serviceName: dastgs
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dastgs
+  template:
+    metadata:
+      labels:
+        app: dastgs
+    spec:
+      containers:
+        - name: dastgs
+          env:
+            - name: 'ConnectionStrings__EDASTDB'
+              valueFrom:
+                secretKeyRef:
+                  name: dastapisecrets
+                  key: DAST_EDASTDB
+          image: fortifydocker/scancentral-dast-globalservice
+          imagePullPolicy: IfNotPresent 
+      imagePullSecrets:
+        - name: regcred
+      nodeSelector:
+        kubernetes.io/hostname: win01
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dastapi
+spec:
+  selector:
+    app: dastapi
+  ports:
+    - protocol: TCP
+      port: 443
+      targetPort: 443
+  type: ClusterIP
+  clusterIP: 10.96.96.4
